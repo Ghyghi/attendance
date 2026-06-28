@@ -1,1 +1,17 @@
-.venv
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+*.env
+
+# Media uploads
+backend/tracker/media/
+
+# VS Code
+.vscode/
+**/.vscode/
