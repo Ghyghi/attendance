@@ -1,0 +1,463 @@
+{
+  "info": {
+    "name": "Attendance Backend",
+    "description": "Full endpoint walkthrough for the school attendance Django backend. Run requests top-to-bottom inside each folder on first use \u2014 later requests depend on IDs captured by earlier ones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "school_id", "value": "" },
+    { "key": "admin_username", "value": "schooladmin1" },
+    { "key": "admin_password", "value": "AdminPass123!" },
+    { "key": "teacher_username", "value": "teacher1" },
+    { "key": "teacher_password", "value": "TeacherPass123!" },
+    { "key": "student_username", "value": "student1" },
+    { "key": "student_password", "value": "StudentPass123!" },
+    { "key": "student_id", "value": "" },
+    { "key": "classroom_id", "value": "" },
+    { "key": "session_id", "value": "" },
+    { "key": "session_code", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 - Superuser setup",
+      "item": [
+        {
+          "name": "Login as Superuser",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"YOUR_SUPERUSER_USERNAME\",\n  \"password\": \"YOUR_SUPERUSER_PASSWORD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('access_token', data.access);",
+                  "pm.environment.set('refresh_token', data.refresh);",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create School (superuser-only)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/schools/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Riverside High\",\n  \"address\": \"123 Main St\",\n  \"latitude\": 37.7749,\n  \"longitude\": -122.4194,\n  \"radius_m\": 150\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('school_id', data.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create first Admin for School (superuser-only)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/superuser/users/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\",\n  \"password2\": \"{{admin_password}}\",\n  \"role\": \"admin\",\n  \"school\": {{school_id}},\n  \"first_name\": \"Ada\",\n  \"last_name\": \"Min\",\n  \"email\": \"admin1@riverside.edu\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Schools (sanity check)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/schools/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Admin setup",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('access_token', data.access);",
+                  "pm.environment.set('refresh_token', data.refresh);",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Role is admin', () => pm.expect(data.role).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Profile (/me)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/auth/me/" }
+        },
+        {
+          "name": "Create Teacher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/users/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{teacher_username}}\",\n  \"password\": \"{{teacher_password}}\",\n  \"password2\": \"{{teacher_password}}\",\n  \"role\": \"teacher\",\n  \"first_name\": \"Tom\",\n  \"last_name\": \"Teach\",\n  \"email\": \"teacher1@riverside.edu\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));"] }
+            }
+          ]
+        },
+        {
+          "name": "Create Student",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/users/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{student_username}}\",\n  \"password\": \"{{student_password}}\",\n  \"password2\": \"{{student_password}}\",\n  \"role\": \"student\",\n  \"first_name\": \"Sam\",\n  \"last_name\": \"Student\",\n  \"email\": \"student1@riverside.edu\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Users in My School (find student_id)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/users/?role=student"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "const results = data.results || data;",
+                  "if (results.length) { pm.environment.set('student_id', results[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Classroom",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/schools/classrooms/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"school\": {{school_id}},\n  \"name\": \"Grade 10A\",\n  \"subject\": \"Homeroom\",\n  \"teachers\": [],\n  \"students\": [{{student_id}}]\n}"
+            },
+            "description": "Note: 'teachers' is left empty here \u2014 add the teacher's user id once you've fetched it via List Users (role=teacher), same pattern as the student lookup above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('classroom_id', data.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enroll Student Face (dev: any base64 works if DEBUG_SKIP_FACE=True)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/face/enroll/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_id\": {{student_id}},\n  \"photo\": \"ZmFrZV9iYXNlNjRfcGhvdG8=\"\n}"
+            },
+            "description": "With DEBUG_SKIP_FACE=True the encoding step still calls DeepFace to build the stored encoding (only the *matching* step at submission time is skipped) \u2014 so this needs a real decodable image, not literally any base64 string. See the note in the main reply."
+          }
+        },
+        {
+          "name": "Check Face Enrollment Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/face/student/{{student_id}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Teacher flow",
+      "item": [
+        {
+          "name": "Login as Teacher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{teacher_username}}\",\n  \"password\": \"{{teacher_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('access_token', data.access);",
+                  "pm.environment.set('refresh_token', data.refresh);",
+                  "pm.test('Role is teacher', () => pm.expect(data.role).to.eql('teacher'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start Attendance Session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/attendance/sessions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classroom\": {{classroom_id}}\n}"
+            },
+            "description": "Will 400/403 unless this teacher is actually attached to the classroom's 'teachers' M2M \u2014 go back and PATCH the classroom to add this teacher's id if needed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.id) { pm.environment.set('session_id', data.id); }",
+                  "if (data.code) { pm.environment.set('session_code', data.code); }",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Sessions",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/attendance/sessions/" }
+        },
+        {
+          "name": "Get Session Detail (code, QR, expiry)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/attendance/sessions/{{session_id}}/" }
+        },
+        {
+          "name": "View Session Records (before student submits)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/attendance/sessions/{{session_id}}/records/" }
+        },
+        {
+          "name": "Close Session (is_active=false)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/attendance/sessions/{{session_id}}/",
+            "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Student flow",
+      "item": [
+        {
+          "name": "Login as Student",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{student_username}}\",\n  \"password\": \"{{student_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "pm.environment.set('access_token', data.access);",
+                  "pm.environment.set('refresh_token', data.refresh);",
+                  "pm.test('Role is student', () => pm.expect(data.role).to.eql('student'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Attendance (code + GPS + selfie)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/attendance/submit/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{session_code}}\",\n  \"latitude\": 37.7749,\n  \"longitude\": -122.4194,\n  \"selfie\": \"ZmFrZV9iYXNlNjRfc2VsZmll\"\n}"
+            },
+            "description": "Field is 'selfie', not 'selfie_base64'. With DEBUG_SKIP_GPS/DEBUG_SKIP_FACE=True, lat/lng and selfie content don't need to be real \u2014 the chain returns early before checking them. Re-test with real coordinates outside radius_m to see a GPS rejection."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 (present) or 400 (rejected)', () => {",
+                  "  pm.expect([201, 400]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Again (expect duplicate rejection)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/attendance/submit/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{session_code}}\",\n  \"latitude\": 37.7749,\n  \"longitude\": -122.4194,\n  \"selfie\": \"ZmFrZV9iYXNlNjRfc2VsZmll\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status 400 duplicate', () => pm.response.to.have.status(400));"] }
+            }
+          ]
+        },
+        {
+          "name": "View My Attendance History",
+          "request": { "method": "GET", "url": "{{base_url}}/api/v1/attendance/history/" }
+        }
+      ]
+    },
+    {
+      "name": "04 - Auth utilities",
+      "item": [
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/token/refresh/",
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.access) { pm.environment.set('access_token', data.access); }",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/me/password/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"OldPass123!\",\n  \"new_password\": \"NewPass123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout (blacklist refresh token)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/logout/",
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Notifications (stub)",
+      "item": [
+        { "name": "List Notifications", "request": { "method": "GET", "url": "{{base_url}}/api/v1/notifications/" } },
+        {
+          "name": "Mark All Read",
+          "request": { "method": "POST", "url": "{{base_url}}/api/v1/notifications/read-all/" }
+        }
+      ]
+    }
+  ]
+}
